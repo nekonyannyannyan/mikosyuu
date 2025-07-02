@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>巫女インベーダー（クリア演出つき）</title>
+  <title>巫女インベーダー</title>
   <style>
     body {
       margin: 0;
@@ -68,7 +68,7 @@
   </style>
 </head>
 <body>
-  <h1>?? 巫女インベーダー</h1>
+  <h1>巫女インベーダー</h1>
   <canvas id="game" width="300" height="400"></canvas>
 
   <div class="controls touch-buttons">
@@ -83,44 +83,46 @@
     【スマホ】ボタンで操作
   </div>
 
-  <!-- 画像読み込み -->
+  <!-- 自機画像 -->
   <img id="playerImg" src="miko san.png" style="display:none;" />
+  <!-- クリア画面 -->
   <div class="clear-screen" id="clearScreen">
     <img src="チャットGPT君の全力.png" alt="Clear Image">
-    <div>Clear！！おめでとう??<br>これはチャットGPT君による本気で媚びた画像だよ</div>
+    <div>Clear!! おめでとう<br>これはチャットGPT君による本気で媚びた画像だよ</div>
   </div>
 
   <script>
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
+
     const clearScreen = document.getElementById("clearScreen");
+    const playerImg = document.getElementById("playerImg");
 
     const player = { x: 130, y: 370, w: 32, h: 32 };
     const hitboxSize = 8;
-    let bullets = [];
-    let canShoot = true;
 
-    let invaders = [];
+    let bullets = [];
     let invaderBullets = [];
+    let invaders = [];
     let invaderDir = 2;
 
-    const keys = {};
+    let canShoot = true;
     let gameOver = false;
     let gameCleared = false;
 
-    const playerImg = document.getElementById("playerImg");
+    const keys = {};
 
     function initGame() {
       player.x = 130;
       bullets = [];
-      canShoot = true;
       invaderBullets = [];
+      invaders = [];
       invaderDir = 2;
+      canShoot = true;
       gameOver = false;
       gameCleared = false;
       clearScreen.style.display = "none";
 
-      invaders = [];
       for (let y = 0; y < 3; y++) {
         for (let x = 0; x < 6; x++) {
           invaders.push({ x: 30 + x * 40, y: 30 + y * 30, w: 20, h: 20 });
@@ -167,6 +169,7 @@
       invaderBullets.forEach(b => b.y += 5);
       invaderBullets = invaderBullets.filter(b => b.y < canvas.height);
 
+      // 被弾判定（中心8x8）
       for (let b of invaderBullets) {
         const cx = player.x + player.w / 2;
         const cy = player.y + player.h / 2;
@@ -177,31 +180,36 @@
           b.y < cy + hitboxSize / 2
         ) {
           gameOver = true;
-          setTimeout(() => alert(" ゲームオーバー！"), 100);
+          setTimeout(() => alert("ゲームオーバー！"), 100);
         }
       }
 
-      let hitEdge = false;
+      let edgeHit = false;
       for (let inv of invaders) {
         inv.x += invaderDir;
-        if (inv.x < 0 || inv.x + inv.w > canvas.width) hitEdge = true;
+        if (inv.x < 0 || inv.x + inv.w > canvas.width) edgeHit = true;
       }
-      if (hitEdge) invaderDir *= -1;
+      if (edgeHit) invaderDir *= -1;
 
+      // 敵の弾（毎フレーム数発）
       for (let i = 0; i < 3; i++) {
-        if (Math.random() < 0.2) {
+        if (Math.random() < 0.2 && invaders.length > 0) {
           const r = invaders[Math.floor(Math.random() * invaders.length)];
-          if (r) {
-            invaderBullets.push({ x: r.x + r.w / 2, y: r.y + r.h });
-          }
+          invaderBullets.push({ x: r.x + r.w / 2, y: r.y + r.h });
         }
       }
 
+      // 自弾と敵の当たり判定
       for (let i = invaders.length - 1; i >= 0; i--) {
         for (let j = bullets.length - 1; j >= 0; j--) {
           const inv = invaders[i];
           const b = bullets[j];
-          if (b.x > inv.x && b.x < inv.x + inv.w && b.y > inv.y && b.y < inv.y + inv.h) {
+          if (
+            b.x > inv.x &&
+            b.x < inv.x + inv.w &&
+            b.y > inv.y &&
+            b.y < inv.y + inv.h
+          ) {
             invaders.splice(i, 1);
             bullets.splice(j, 1);
             break;
@@ -209,6 +217,7 @@
         }
       }
 
+      // クリア判定
       if (invaders.length === 0 && !gameCleared) {
         gameCleared = true;
         clearScreen.style.display = "flex";
@@ -216,4 +225,38 @@
     }
 
     function draw() {
-      ctx.clearRect(0, 0
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (playerImg.complete) {
+        ctx.drawImage(playerImg, 0, 0, 64, 64, player.x, player.y, player.w, player.h);
+      }
+
+      ctx.fillStyle = "white";
+      bullets.forEach(b => ctx.fillRect(b.x, b.y, 2, 10));
+
+      ctx.fillStyle = "red";
+      invaders.forEach(inv => ctx.fillRect(inv.x, inv.y, inv.w, inv.h));
+
+      ctx.fillStyle = "yellow";
+      invaderBullets.forEach(b => ctx.fillRect(b.x, b.y, 3, 10));
+    }
+
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    // 画像が読み込まれてから開始
+    if (playerImg.complete) {
+      initGame();
+      loop();
+    } else {
+      playerImg.onload = () => {
+        initGame();
+        loop();
+      };
+    }
+  </script>
+</body>
+</html>
