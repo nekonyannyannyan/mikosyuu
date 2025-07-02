@@ -75,12 +75,16 @@
     <button id="left">←</button>
     <button id="shoot">撃つ</button>
     <button id="right">→</button>
+    <div style="width: 100%; display: flex; justify-content: center;">
+      <button id="slowLeft">《《</button>
+      <button id="slowRight">》》</button>
+    </div>
     <button id="retry">リトライ</button>
   </div>
 
   <div class="instruction">
     【PC】← → / スペース：撃つ / Shift：ゆっくり / R：リトライ<br>
-    【スマホ】ボタンで操作
+    【スマホ】ボタンで操作（押しっぱなしOK）
   </div>
 
   <!-- 自機画像 -->
@@ -95,8 +99,8 @@
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
 
-    const clearScreen = document.getElementById("clearScreen");
     const playerImg = document.getElementById("playerImg");
+    const clearScreen = document.getElementById("clearScreen");
 
     const player = { x: 130, y: 370, w: 32, h: 32 };
     const hitboxSize = 8;
@@ -111,6 +115,7 @@
     let gameCleared = false;
 
     const keys = {};
+    const moveState = { left: false, right: false, slowLeft: false, slowRight: false };
 
     function initGame() {
       player.x = 130;
@@ -137,10 +142,17 @@
     });
     document.addEventListener("keyup", e => keys[e.key] = false);
 
-    document.getElementById("left").addEventListener("touchstart", () => keys["ArrowLeft"] = true);
-    document.getElementById("left").addEventListener("touchend", () => keys["ArrowLeft"] = false);
-    document.getElementById("right").addEventListener("touchstart", () => keys["ArrowRight"] = true);
-    document.getElementById("right").addEventListener("touchend", () => keys["ArrowRight"] = false);
+    // スマホ移動ボタン（押しっぱなし対応）
+    const setMove = (id, dir) => {
+      const btn = document.getElementById(id);
+      btn.addEventListener("touchstart", e => { e.preventDefault(); moveState[dir] = true; }, { passive: false });
+      btn.addEventListener("touchend", () => moveState[dir] = false);
+    };
+    setMove("left", "left");
+    setMove("right", "right");
+    setMove("slowLeft", "slowLeft");
+    setMove("slowRight", "slowRight");
+
     document.getElementById("shoot").addEventListener("touchstart", shoot);
     document.getElementById("retry").addEventListener("touchstart", retry);
 
@@ -159,9 +171,14 @@
     function update() {
       if (gameOver || gameCleared) return;
 
-      const moveSpeed = keys["Shift"] ? 2 : 5;
-      if (keys["ArrowLeft"] && player.x > 0) player.x -= moveSpeed;
-      if (keys["ArrowRight"] && player.x < canvas.width - player.w) player.x += moveSpeed;
+      let moveSpeed = 0;
+      const isSlow = keys["Shift"] || moveState.slowLeft || moveState.slowRight;
+      const isFast = keys["ArrowLeft"] || keys["ArrowRight"] || moveState.left || moveState.right;
+      if (isSlow) moveSpeed = 2;
+      else if (isFast) moveSpeed = 5;
+
+      if ((keys["ArrowLeft"] || moveState.left || moveState.slowLeft) && player.x > 0) player.x -= moveSpeed;
+      if ((keys["ArrowRight"] || moveState.right || moveState.slowRight) && player.x < canvas.width - player.w) player.x += moveSpeed;
 
       bullets.forEach(b => b.y -= 8);
       bullets = bullets.filter(b => b.y > 0);
@@ -169,7 +186,6 @@
       invaderBullets.forEach(b => b.y += 5);
       invaderBullets = invaderBullets.filter(b => b.y < canvas.height);
 
-      // 被弾判定（中心8x8）
       for (let b of invaderBullets) {
         const cx = player.x + player.w / 2;
         const cy = player.y + player.h / 2;
@@ -191,7 +207,6 @@
       }
       if (edgeHit) invaderDir *= -1;
 
-      // 敵の弾（毎フレーム数発）
       for (let i = 0; i < 3; i++) {
         if (Math.random() < 0.2 && invaders.length > 0) {
           const r = invaders[Math.floor(Math.random() * invaders.length)];
@@ -199,17 +214,11 @@
         }
       }
 
-      // 自弾と敵の当たり判定
       for (let i = invaders.length - 1; i >= 0; i--) {
         for (let j = bullets.length - 1; j >= 0; j--) {
           const inv = invaders[i];
           const b = bullets[j];
-          if (
-            b.x > inv.x &&
-            b.x < inv.x + inv.w &&
-            b.y > inv.y &&
-            b.y < inv.y + inv.h
-          ) {
+          if (b.x > inv.x && b.x < inv.x + inv.w && b.y > inv.y && b.y < inv.y + inv.h) {
             invaders.splice(i, 1);
             bullets.splice(j, 1);
             break;
@@ -217,7 +226,6 @@
         }
       }
 
-      // クリア判定
       if (invaders.length === 0 && !gameCleared) {
         gameCleared = true;
         clearScreen.style.display = "flex";
@@ -226,17 +234,13 @@
 
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
       if (playerImg.complete) {
         ctx.drawImage(playerImg, 0, 0, 64, 64, player.x, player.y, player.w, player.h);
       }
-
       ctx.fillStyle = "white";
       bullets.forEach(b => ctx.fillRect(b.x, b.y, 2, 10));
-
       ctx.fillStyle = "red";
       invaders.forEach(inv => ctx.fillRect(inv.x, inv.y, inv.w, inv.h));
-
       ctx.fillStyle = "yellow";
       invaderBullets.forEach(b => ctx.fillRect(b.x, b.y, 3, 10));
     }
@@ -247,7 +251,6 @@
       requestAnimationFrame(loop);
     }
 
-    // 画像が読み込まれてから開始
     if (playerImg.complete) {
       initGame();
       loop();
